@@ -10,6 +10,27 @@ import (
 var _ = net.Listen
 var _ = os.Exit
 
+
+func handleConnection(conn net.Conn) {
+	cr := NewConnectionReader(conn)
+	reqLine, err := parseRequestLine(cr)
+	if err != nil {
+		fmt.Println("error parsing request line", err)
+		return
+	}
+
+	fmt.Printf("%s %s %s", reqLine.method, reqLine.target, reqLine.httpVersion)
+
+	res := []byte("HTTP/1.1 404 Not Found\r\n\r\n")
+
+	if reqLine.target == "/" {
+		res = []byte("HTTP/1.1 200 OK\r\n\r\n")
+	}
+
+	conn.Write(res)
+	conn.Close()
+}
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
@@ -29,8 +50,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	res := []byte("HTTP/1.1 200 OK\r\n\r\n")
-	fmt.Println("Server running ....");
-	conn.Write(res)
-	conn.Close()
+	handleConnection(conn)
 }
