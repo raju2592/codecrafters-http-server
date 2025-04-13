@@ -19,11 +19,11 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	fmt.Printf("%s %s %s", reqLine.method, reqLine.target, reqLine.httpVersion)
+	fmt.Printf("%s %s %s", reqLine.method, reqLine.path, reqLine.httpVersion)
 
 	res := []byte("HTTP/1.1 404 Not Found\r\n\r\n")
 
-	if reqLine.target == "/" {
+	if reqLine.path == "/" {
 		res = []byte("HTTP/1.1 200 OK\r\n\r\n")
 	}
 

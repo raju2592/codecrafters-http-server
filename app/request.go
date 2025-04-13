@@ -2,10 +2,10 @@ package main
 
 type RequestLine struct {
 	method string;
-	target string;
+	path string;
 	httpVersion string;
 }
 
-type Requst struct {
+type Request struct {
 	requestLine RequestLine
 }

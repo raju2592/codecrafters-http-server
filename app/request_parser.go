@@ -45,8 +45,21 @@ func parseRequestLine(cr *ConnectionReader) (*RequestLine, error) {
 
 	req := &RequestLine{
 		method: fields[0],
-		target: fields[1],
+		path: fields[1],
 		httpVersion: fields[2],
+	}
+
+	return req, nil
+}
+
+func parseRequst(cr *ConnectionReader) (*Request, error) {
+	reqLine, err := parseRequestLine(cr)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &Request{
+		requestLine: *reqLine,
 	}
 
 	return req, nil
