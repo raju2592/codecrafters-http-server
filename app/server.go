@@ -49,21 +49,27 @@ func (s *Server) accept() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-	
-		cr := NewConnectionReader(conn)
-		req, err := parseRequst(cr)
-		if err != nil {
-			fmt.Printf("Error parsing request: %s", err.Error())
-			continue
-		}
-	
-		res := s.handleRequest(req)
-		err = s.sendResponse(conn, req, res)
-		if err != nil {
-			fmt.Printf("Error sending response: %s", err.Error())
-		}
-		conn.Close()
+
+		go s.handleConnection(conn)
 	}
+}
+
+func (s *Server) handleConnection(conn net.Conn) {
+	cr := NewConnectionReader(conn)
+
+	req, err := parseRequst(cr)
+	if err != nil {
+		fmt.Printf("Error parsing request: %s", err.Error())
+		conn.Close()
+		return
+	}
+
+	res := s.handleRequest(req)
+	err = s.sendResponse(conn, req, res)
+	if err != nil {
+		fmt.Printf("Error sending response: %s", err.Error())
+	}
+	conn.Close()
 }
 
 func (s *Server) sendResponse(conn net.Conn, req *Request, res *HandlerResponse) error {
