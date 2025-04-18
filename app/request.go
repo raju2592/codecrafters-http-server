@@ -7,5 +7,6 @@ type RequestLine struct {
 }
 
 type Request struct {
-	requestLine RequestLine
+	requestLine RequestLine;
+	headers map[string]string;
 }

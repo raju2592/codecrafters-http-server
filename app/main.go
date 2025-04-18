@@ -49,10 +49,19 @@ func HandleHome(req *HandlerReqest) *HandlerResponse {
 	}
 }
 
-func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+func HandleUserAgent(req *HandlerReqest) *HandlerResponse {
+	userAgent, _ := req.request.headers["User-Agent"]
+	return &HandlerResponse{
+		status: "200 OK",
+		headers: map[string]string {
+			"Content-Type": "text/plain",
+			"Content-Length": fmt.Sprintf("%d", len(userAgent)),
+		},
+		body: []byte(userAgent), 
+	}
+}
 
+func main() {
 	// Uncomment this block to pass the first stage
 	//
 	// l, err := net.Listen("tcp", "0.0.0.0:4221")
@@ -71,6 +80,7 @@ func main() {
 	// handleConnection(conn)
 	server := NewServer()
 	server.RegisterRoute("GET", "/echo/{str}", HandleEcho)
+	server.RegisterRoute("GET", "/user-agent", HandleUserAgent)
 	server.RegisterRoute("GET", "/", HandleHome)
 	server.Listen("0.0.0.0:4221")
 }

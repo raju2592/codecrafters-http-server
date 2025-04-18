@@ -52,14 +52,86 @@ func parseRequestLine(cr *ConnectionReader) (*RequestLine, error) {
 	return req, nil
 }
 
+func consumeByte(cr *ConnectionReader) error {
+	_, err := cr.getByte()
+	return err
+}
+
+func readUntil(cr *ConnectionReader, b byte) ([]byte, error) {
+	ret := make([]byte, 0, 10)
+	
+	for {
+		nb, err := cr.getByte()
+		if err != nil {
+			return []byte{}, err
+		}
+	
+		if nb == b {
+			return ret, nil
+		}
+
+		ret = append(ret, nb)
+	}
+}
+
+func parseHeaders(cr *ConnectionReader) (map[string]string, error) {
+	headers := make(map[string]string)
+
+	for {
+		b, err := cr.getByte()
+		if err != nil {
+			return nil, err
+		}
+
+		if b == byte('\r') {
+			err := consumeByte(cr)
+			if err != nil {
+				return nil, err
+			}
+
+			return headers, nil
+		}
+
+		restName, err := readUntil(cr, byte(':'))
+		if err != nil {
+			return nil, err
+		}
+
+		err = consumeByte(cr)
+		if err != nil {
+			return nil, err
+		}
+		
+		name := string(append([]byte{b}, restName...))
+
+		value, err := readUntil(cr, byte('\r'))
+		if err != nil {
+			return nil, err
+		}
+
+		err = consumeByte(cr)
+		if err != nil {
+			return nil, err
+		}
+
+		headers[name] = string(value)
+	}
+}
+
 func parseRequst(cr *ConnectionReader) (*Request, error) {
 	reqLine, err := parseRequestLine(cr)
 	if err != nil {
 		return nil, err
 	}
 
+	headers, err := parseHeaders(cr)
+	if err != nil {
+		return nil, err
+	}
+
 	req := &Request{
 		requestLine: *reqLine,
+		headers: headers,
 	}
 
 	return req, nil

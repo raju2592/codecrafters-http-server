@@ -39,3 +39,12 @@ func (cr *ConnectionReader) getByte() (byte, error) {
 	cr.data = append(cr.data, cr.buf[:n]...)
 	return cr.getNext(), nil;
 }
+
+func (cr *ConnectionReader) peekByte() (byte, error) {
+	val, err := cr.getByte();
+	if err != nil {
+		return 0, err
+	}
+	cr.nextRead--;
+	return val, nil
+}
