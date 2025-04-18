@@ -8,7 +8,7 @@ import (
 )
 
 type HandlerResponse struct {
-	status int
+	status string
 	headers map[string]string
 	body []byte
 }
@@ -38,23 +38,60 @@ func (s *Server) Listen(address string) error {
 	}
 
 	s.l = l;
-	go s.accept()
+	s.accept()
 	return nil
 }
 
 func (s *Server) accept() {
-	conn, err := s.l.Accept()
+	for {
+		conn, err := s.l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+	
+		cr := NewConnectionReader(conn)
+		req, err := parseRequst(cr)
+		if err != nil {
+			fmt.Printf("Error parsing request: %s", err.Error())
+			continue
+		}
+	
+		res := s.handleRequest(req)
+		err = s.sendResponse(conn, req, res)
+		if err != nil {
+			fmt.Printf("Error sending response: %s", err.Error())
+		}
+		conn.Close()
+	}
+}
+
+func (s *Server) sendResponse(conn net.Conn, req *Request, res *HandlerResponse) error {
+	status := fmt.Sprintf("%s %s\r\n", req.requestLine.httpVersion, res.status);
+	_, err := conn.Write([]byte(status))
 	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+		return err
 	}
 
-	cr := NewConnectionReader(conn)
-	req, err := parseRequst(cr)
-	fmt.Printf("Error parsing request: %s", err.Error())
+	headers := make([]byte, 0, 1024);
 
-	s.handleRequest(req)
+	for k, v := range res.headers {
+		headers = append(headers, []byte(fmt.Sprintf("%s: %s\r\n", k, v))...)
+	}
 
+	headers = append(headers, []byte("\r\n")...)
+
+	_, err = conn.Write([]byte(headers))
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Write(res.body)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type PathMatch struct {
@@ -66,7 +103,7 @@ func (s *Server) handleRequest(req *Request) *HandlerResponse {
 	pathMatch := s.route(req)
 	if pathMatch == nil {
 		return &HandlerResponse{
-			status: 404,
+			status: "404 Not Found",
 		}
 	}
 
@@ -84,6 +121,7 @@ func (s *Server) route(req * Request) *PathMatch {
 	requestPath := req.requestLine.path
 
 	requestHandlers, ok := s.handlers[method]
+
 	if !ok {
 		return nil
 	}
@@ -135,6 +173,7 @@ func getParamName(seg string) string {
 
 func (s *Server) RegisterRoute(method string, path string, handler Handler) {
 	methodHandlers, ok := s.handlers[method]
+	fmt.Printf("Registering %s %s\n", method, path)
 	if !ok {
 		methodHandlers = make(map[string]Handler)
 		s.handlers[method] = methodHandlers

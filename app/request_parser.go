@@ -6,7 +6,7 @@ import (
 )
 
 func parseRequestSegment(cr *ConnectionReader) ([]byte, error) {
-	ret := make([]byte, 1024)
+	ret := make([]byte, 0, 1024)
 	for {
 		b, err := cr.getByte()
 		if err != nil {

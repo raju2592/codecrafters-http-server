@@ -1,6 +1,8 @@
 package main
 
-import "net"
+import (
+	"net"
+)
 
 type ConnectionReader struct {
 	conn net.Conn
@@ -14,7 +16,7 @@ func NewConnectionReader(conn net.Conn) *ConnectionReader {
 		conn: conn,
 		nextRead: 0,
 		buf: make([]byte, 1024),
-		data: make([]byte, 2048),
+		data: make([]byte, 0, 2048),
 	}
 }
 
@@ -29,11 +31,11 @@ func (cr *ConnectionReader) getByte() (byte, error) {
 		return cr.getNext(), nil
 	}
 
-	_, err := cr.conn.Read(cr.buf)
+	n, err := cr.conn.Read(cr.buf)
 	if err != nil {
 		return 0, err
 	}
   
-	cr.data = append(cr.data, cr.buf...)
+	cr.data = append(cr.data, cr.buf[:n]...)
 	return cr.getNext(), nil;
 }
