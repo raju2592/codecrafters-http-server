@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 )
@@ -39,7 +41,7 @@ func HandleEcho(req *HandlerReqest) *HandlerResponse {
 			"Content-Type": "text/plain",
 			"Content-Length": fmt.Sprintf("%d", len(str)),
 		},
-		body: []byte(str),
+		body: NewStaticReadStream([]byte(str)),
 	}
 }
 
@@ -57,7 +59,41 @@ func HandleUserAgent(req *HandlerReqest) *HandlerResponse {
 			"Content-Type": "text/plain",
 			"Content-Length": fmt.Sprintf("%d", len(userAgent)),
 		},
-		body: []byte(userAgent), 
+		body: NewStaticReadStream([]byte(userAgent)), 
+	}
+}
+
+func HandleFile(req *HandlerReqest) *HandlerResponse {
+	file, _ := req.pathParams["filename"]
+	root := os.Args[2]
+	filePath := root + file
+
+	fmt.Println("path ", filePath)
+	fs, err := os.Stat(filePath)
+
+	if errors.Is(err, os.ErrNotExist) {
+		return &HandlerResponse{
+			status: "404 Not Found",
+		}	
+	}
+
+	if err != nil {
+		log.Fatal("Failed to get file info")
+	}
+
+	stream, err := NewFileReadStream(filePath)
+
+	if err != nil {
+		log.Fatal("Failed to read file")
+	}
+
+	return &HandlerResponse{
+		status: "200 OK",
+		headers: map[string]string {
+			"Content-Type": "application/octet-stream",
+			"Content-Length": fmt.Sprintf("%d", fs.Size()),
+		},
+		body: stream,
 	}
 }
 
@@ -77,10 +113,13 @@ func main() {
 	// 	os.Exit(1)
 	// }
 
+	fmt.Println(os.Args)
+
 	// handleConnection(conn)
 	server := NewServer()
 	server.RegisterRoute("GET", "/echo/{str}", HandleEcho)
 	server.RegisterRoute("GET", "/user-agent", HandleUserAgent)
+	server.RegisterRoute("GET", "/files/{filename}", HandleFile)
 	server.RegisterRoute("GET", "/", HandleHome)
 	server.Listen("0.0.0.0:4221")
 }

@@ -10,7 +10,7 @@ import (
 type HandlerResponse struct {
 	status string
 	headers map[string]string
-	body []byte
+	body ReadStream
 }
 
 type HandlerReqest struct {
@@ -92,12 +92,31 @@ func (s *Server) sendResponse(conn net.Conn, req *Request, res *HandlerResponse)
 		return err
 	}
 
-	_, err = conn.Write(res.body)
-	if err != nil {
-		return err
+	if res.body == nil {
+		return nil
 	}
+	
+	for {
+		select {
+		case	data := <- res.body.DataC():
+			if data == nil {
+				return nil
+			}
+			_, err = conn.Write(data)
+			if err != nil {
+				res.body.Close()
+				return err
+			}
+		case err := <- res.body.ErrC():
+			return err
+		}
+	}
+	// _, err = conn.Write(res.body)
+	// if err != nil {
+	// 	return err
+	// }
 
-	return nil
+	// return nil
 }
 
 type PathMatch struct {
