@@ -100,6 +100,7 @@ func (s *Server) sendResponse(conn net.Conn, req *Request, res *HandlerResponse)
 		select {
 		case	data := <- res.body.DataC():
 			if data == nil {
+				res.body.Close()
 				return nil
 			}
 			_, err = conn.Write(data)
@@ -111,12 +112,6 @@ func (s *Server) sendResponse(conn net.Conn, req *Request, res *HandlerResponse)
 			return err
 		}
 	}
-	// _, err = conn.Write(res.body)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// return nil
 }
 
 type PathMatch struct {

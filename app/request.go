@@ -9,4 +9,6 @@ type RequestLine struct {
 type Request struct {
 	requestLine RequestLine;
 	headers map[string]string;
+	body ReadStream;
+	end chan bool
 }

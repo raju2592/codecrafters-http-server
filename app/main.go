@@ -63,7 +63,7 @@ func HandleUserAgent(req *HandlerReqest) *HandlerResponse {
 	}
 }
 
-func HandleFile(req *HandlerReqest) *HandlerResponse {
+func HandleFileGet(req *HandlerReqest) *HandlerResponse {
 	file, _ := req.pathParams["filename"]
 	root := os.Args[2]
 	filePath := root + file
@@ -97,6 +97,54 @@ func HandleFile(req *HandlerReqest) *HandlerResponse {
 	}
 }
 
+func HandleFilePost(req *HandlerReqest) *HandlerResponse {
+	fileName, _ := req.pathParams["filename"]
+	root := os.Args[2]
+	filePath := root + fileName
+
+	// fmt.Println("path ", filePath)
+	// fs, err := os.Stat(filePath)
+
+	// if errors.Is(err, os.ErrNotExist) {
+	// 	return &HandlerResponse{
+	// 		status: "404 Not Found",
+	// 	}	
+	// }
+
+	file, err := os.Create(filePath)
+
+	if err != nil {
+		log.Fatal("Failed to get file info")
+	}
+
+	for {
+		select {
+		case data := <- req.request.body.DataC():
+			if data == nil {
+				goto done
+			}
+
+			fmt.Println(data);
+			
+			_, err := file.Write(data)
+			if err != nil {
+				log.Fatal("Failed to write file")
+			}
+		case err := <- req.request.body.ErrC():
+			log.Fatal("Failed to read request body: %s", err.Error())
+		}
+	}
+
+	done: err = file.Close()
+	if err != nil {
+		log.Fatal("Failed to close file")
+	}
+
+	return &HandlerResponse{
+		status: "201 Created",
+	}
+}
+
 func main() {
 	// Uncomment this block to pass the first stage
 	//
@@ -119,7 +167,8 @@ func main() {
 	server := NewServer()
 	server.RegisterRoute("GET", "/echo/{str}", HandleEcho)
 	server.RegisterRoute("GET", "/user-agent", HandleUserAgent)
-	server.RegisterRoute("GET", "/files/{filename}", HandleFile)
+	server.RegisterRoute("GET", "/files/{filename}", HandleFileGet)
+	server.RegisterRoute("POST", "/files/{filename}", HandleFilePost)
 	server.RegisterRoute("GET", "/", HandleHome)
 	server.Listen("0.0.0.0:4221")
 }

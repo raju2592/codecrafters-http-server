@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -118,6 +120,56 @@ func parseHeaders(cr *ConnectionReader) (map[string]string, error) {
 	}
 }
 
+func completeRequest(cr *ConnectionReader, req *Request, contentLength int) (*Request, error) {
+	stream := NewManualReadStream()
+
+	rem := contentLength
+
+	go func() {
+		fmt.Print("read loop ")
+		for {
+			bufSz := 1024;
+			if rem > 0 {
+				bufSz = min(bufSz, rem)
+			}
+			
+			readBuf := make([]byte, 0, bufSz)
+
+			for i := 0; i < bufSz; i++ {
+				b, err := cr.getByte()
+
+				if err != nil {
+					fmt.Printf("Got an error")
+					stream.SendError(err)
+					req.end <- false
+					return
+				}
+		
+				readBuf = append(readBuf, b)
+			}
+
+
+			select {
+			case stream.dataC <- readBuf:
+				rem -= bufSz
+
+				if (rem == 0) {
+					close(stream.dataC)
+					req.end <- true
+					return
+				}
+	
+			case <- stream.closeC:
+				req.end <- false
+				return
+			}
+		}
+	}()
+
+	req.body = stream
+	return req, nil
+}
+
 func parseRequst(cr *ConnectionReader) (*Request, error) {
 	reqLine, err := parseRequestLine(cr)
 	if err != nil {
@@ -129,10 +181,19 @@ func parseRequst(cr *ConnectionReader) (*Request, error) {
 		return nil, err
 	}
 
+	contentLength, _ := strconv.Atoi(headers["Content-Length"])
+
 	req := &Request{
 		requestLine: *reqLine,
 		headers: headers,
+		end: make(chan bool, 1),
 	}
 
-	return req, nil
+	if contentLength == 0 {
+		req.end <- true
+		return req, nil;
+	}
+
+	fmt.Println("Will parse body")
+	return completeRequest(cr, req, contentLength);
 }

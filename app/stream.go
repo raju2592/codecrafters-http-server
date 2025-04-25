@@ -11,12 +11,60 @@ type ReadStream interface {
 	Close()
 }
 
-type FileReadStream struct {
-	file *os.File
-	buf []byte
+type ManualReadStream struct {
 	dataC chan []byte
 	errC chan error
 	closeC chan bool
+}
+
+func NewManualReadStream() *ManualReadStream {
+	return &ManualReadStream{
+		dataC: make(chan []byte, 10),
+		errC: make(chan error, 1),
+		closeC: make(chan bool, 1),
+	}
+}
+
+func (ms * ManualReadStream) DataC() chan []byte {
+	return ms.dataC;
+}
+
+func (ms * ManualReadStream) ErrC() chan error {
+	return ms.errC;
+}
+
+func (ms *ManualReadStream) Close() {
+	ms.closeC <- true
+}
+
+func (ms *ManualReadStream) SendData(data []byte) {
+	go func () {
+		if (data == nil) {
+			close(ms.dataC)
+		} else {
+			ms.dataC <- data
+		}
+	}()
+}
+
+func (ms *ManualReadStream) SendError(err error) {
+	go func () {
+		ms.ErrC() <- err
+	}()
+}
+
+type ReaderReadStream struct {
+	// file *os.File
+	rem int
+	reader io.Reader
+	dataC chan []byte
+	errC chan error
+	closeC chan bool
+}
+
+type FileReadStream struct {
+	*ReaderReadStream
+	file *os.File
 }
 
 func NewFileReadStream(filePath string) (*FileReadStream, error) {
@@ -25,9 +73,31 @@ func NewFileReadStream(filePath string) (*FileReadStream, error) {
 		return nil, err
 	}
 
-	stream := &FileReadStream {
+	readerStream := &ReaderReadStream {
+		reader: file,
+		dataC: make(chan []byte, 10),
+		errC: make(chan error, 1),
+		closeC: make(chan bool, 1),
+	}
+
+	fileStream := &FileReadStream{
+		ReaderReadStream: readerStream,
 		file: file,
-		buf: make([]byte, 1024),
+	}
+
+	go fileStream.start()
+	return fileStream, nil
+}
+
+func (fs *FileReadStream) Close() {
+	fs.ReaderReadStream.Close()
+	fs.file.Close()
+}
+
+func NewReaderReadStream(reader io.Reader, n int) (*ReaderReadStream, error) {
+	stream := &ReaderReadStream {
+		rem: n,
+		reader: reader,
 		dataC: make(chan []byte, 10),
 		errC: make(chan error, 1),
 		closeC: make(chan bool, 1),
@@ -37,9 +107,16 @@ func NewFileReadStream(filePath string) (*FileReadStream, error) {
 	return stream, nil
 }
 
-func (s * FileReadStream) start() {
+func (s * ReaderReadStream) start() {
 	for {
-		n, err := s.file.Read(s.buf)
+		bufSz := 1024;
+		if s.rem > 0 {
+			bufSz = min(bufSz, s.rem)
+		}
+
+		readBuf := make([]byte, bufSz)
+
+		n, err := s.reader.Read(readBuf)
 
 		dataChan := s.dataC
 		var errChan chan error = nil
@@ -48,36 +125,43 @@ func (s * FileReadStream) start() {
 
 		if err == io.EOF {
 			close(s.dataC)
-			break
+			return
 		}
 		
 		if err != nil {
 			dataChan = nil
 			errChan = s.errC
 		} else {
-			data = s.buf[:n]
+			data = readBuf[:n]
 		}
 
 		select {
 		case dataChan <- data:
-			continue
+			if s.rem > 0 {
+				s.rem -= n
+			}
+
+			if s.rem == 0 {
+				close(s.dataC)
+				return
+			}
 		case errChan <- err:
-			break
+			return
 		case <- s.closeC:
-			break
+			return
 		}
 	}
 }
 
-func (s *FileReadStream) DataC() chan []byte {
+func (s *ReaderReadStream) DataC() chan []byte {
 	return s.dataC;
 }
 
-func (s *FileReadStream) ErrC() chan error {
+func (s *ReaderReadStream) ErrC() chan error {
 	return s.errC
 }
 
-func (s *FileReadStream) Close() {
+func (s *ReaderReadStream) Close() {
 	s.closeC <- true
 }
 
