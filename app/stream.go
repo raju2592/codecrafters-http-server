@@ -173,6 +173,7 @@ type StaticReadStream struct {
 func NewStaticReadStream(data []byte) *StaticReadStream {
 	dataC := make(chan []byte, 1)
 	dataC <- data
+	close(dataC)
 
 	return &StaticReadStream{
 		dataC: dataC,		

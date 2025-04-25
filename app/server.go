@@ -57,19 +57,30 @@ func (s *Server) accept() {
 func (s *Server) handleConnection(conn net.Conn) {
 	cr := NewConnectionReader(conn)
 
-	req, err := parseRequst(cr)
-	if err != nil {
-		fmt.Printf("Error parsing request: %s", err.Error())
-		conn.Close()
-		return
-	}
+	for {
+		fmt.Println("Request parsing")
+		req, err := parseRequst(cr)
+		if err != nil {
+			fmt.Printf("Error parsing request: %s", err.Error())
+			conn.Close()
+			return
+		}
+	
+		res := s.handleRequest(req)
+		fmt.Println("sending response")
 
-	res := s.handleRequest(req)
-	err = s.sendResponse(conn, req, res)
-	if err != nil {
-		fmt.Printf("Error sending response: %s", err.Error())
+		err = s.sendResponse(conn, req, res)
+		fmt.Println("sent response")
+
+		if err != nil {
+			fmt.Printf("Error sending response: %s", err.Error())
+			conn.Close()
+			return
+		}
+
+		<- req.end
+		fmt.Println("Request ended")
 	}
-	conn.Close()
 }
 
 func (s *Server) sendResponse(conn net.Conn, req *Request, res *HandlerResponse) error {
@@ -100,6 +111,7 @@ func (s *Server) sendResponse(conn net.Conn, req *Request, res *HandlerResponse)
 		select {
 		case	data := <- res.body.DataC():
 			if data == nil {
+				fmt.Println("Data is nil")
 				res.body.Close()
 				return nil
 			}
