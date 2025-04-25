@@ -79,10 +79,16 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		encodingHeader := req.headers["Accept-Encoding"]
-		if encodingHeader == "gzip" {
-			res.headers["Content-Encoding"] = "gzip"
+		if encodingHeader != "" {
+			encodings := strings.Split(encodingHeader, ", ")
+			for _, v := range encodings {
+				if v == "gzip" {
+					res.headers["Content-Encoding"] = "gzip"
+					break
+				}
+			}
 		}
-		
+
 		err = s.sendResponse(conn, req, res)
 		fmt.Println("sent response")
 
