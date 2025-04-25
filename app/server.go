@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -84,6 +85,12 @@ func (s *Server) handleConnection(conn net.Conn) {
 			for _, v := range encodings {
 				if v == "gzip" {
 					res.headers["Content-Encoding"] = "gzip"
+					cprsBody, sz, err := compressStream(res.body)
+					if err != nil {
+						log.Fatal("Failed to compress body")
+					}
+					res.headers["Content-Length"] = fmt.Sprintf("%d", sz)
+					res.body = cprsBody
 					break
 				}
 			}
