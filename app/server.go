@@ -80,6 +80,12 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		<- req.end
 		fmt.Println("Request ended")
+		connHeader := req.headers["Connection"]
+		if connHeader == "close" {
+			fmt.Println("Closing connection")
+			conn.Close()
+			return
+		}
 	}
 }
 
