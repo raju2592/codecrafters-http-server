@@ -69,6 +69,15 @@ func (s *Server) handleConnection(conn net.Conn) {
 		res := s.handleRequest(req)
 		fmt.Println("sending response")
 
+		connHeader := req.headers["Connection"]
+
+		if connHeader == "close" {
+			if res.headers == nil {
+				res.headers = make(map[string]string)
+			}
+			res.headers["Connection"] = "close"
+		}
+
 		err = s.sendResponse(conn, req, res)
 		fmt.Println("sent response")
 
@@ -80,7 +89,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 		<- req.end
 		fmt.Println("Request ended")
-		connHeader := req.headers["Connection"]
+
 		if connHeader == "close" {
 			fmt.Println("Closing connection")
 			conn.Close()
